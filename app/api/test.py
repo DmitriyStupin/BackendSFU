@@ -4,8 +4,8 @@ from fastapi import (
     Path
 )
 from config import settings
-from pydantic import BaseModel
-from typing import Annotated
+from pydantic import (BaseModel, Field)
+from typing import (Annotated, Literal)
 
 router = APIRouter(
     tags=["Test"],
@@ -46,3 +46,15 @@ async def read_items(
     if q: 
         results.update({"q": q})
     return results
+
+class FilterParams(BaseModel):
+    model_config = {'extra': 'forbid'}
+
+    limit: int = Field(100, gt=0, le=100)
+    offset: int = Field(0, ge=0)
+    order_by: Literal['created_at', 'update_at'] = 'created_at'
+    tags: list[str] = []
+
+@router.get('/products/')
+async def read_products(filter_query: Annotated[FilterParams, Query()]):
+    return filter_query

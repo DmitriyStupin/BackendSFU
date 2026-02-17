@@ -17,10 +17,14 @@ router = APIRouter(
 def index():
     return {"message": "Hello, World!"}
 
+class FormulaTeam(BaseModel):
+    name: str
+    country: str
+
 class FormulaRacer(BaseModel):
     name: str
     country: str
-    team: str
+    team: FormulaTeam
     number: int
     isWorldChampion: bool = False
 

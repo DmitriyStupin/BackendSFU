@@ -1,7 +1,8 @@
 from fastapi import (
     APIRouter,
     Query,
-    Path
+    Path,
+    Form
 )
 from config import settings
 from pydantic import (BaseModel, Field)
@@ -62,3 +63,7 @@ class FilterParams(BaseModel):
 @router.get('/products/')
 async def read_products(filter_query: Annotated[FilterParams, Query()]):
     return filter_query
+
+@router.post("/login/")
+async def login(username: Annotated[str, Form()], password: Annotated[str, Form()]):
+    return {"username": username}

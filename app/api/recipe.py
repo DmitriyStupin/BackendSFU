@@ -98,3 +98,21 @@ async def update(
     recipe.difficulty = recipe_update.difficulty
   await session.commit()
   return recipe
+
+
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+async def destroy(
+  session: Annotated[
+    AsyncSession,
+    Depends(db_helper.session_getter),
+  ],
+  id: int,
+): 
+  recipe = await session.get(Recipe, id)
+  if not recipe:
+    raise HTTPException(
+      status_code=status.HTTP_404_NOT_FOUND, detail=f"Recipe with id {id} not found"
+    )
+  
+  await session.delete(recipe)
+  await session.commit()

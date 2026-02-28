@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from models import db_helper, Base
 from api import router as api_router
-
+from fastapi.staticfiles import StaticFiles
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -21,10 +21,14 @@ async def lifespan(app: FastAPI):
 main_app = FastAPI(
     lifespan=lifespan,
 )
+
+@main_app.get('/')
+async def root():
+    return {"message": "Hello, World!"}
+
 main_app.include_router(
     api_router,
 )
-
 
 if __name__ == "__main__":
     uvicorn.run(
@@ -33,3 +37,5 @@ if __name__ == "__main__":
         port=settings.run.port,
         reload=settings.run.reload,
     )
+    
+main_app.mount("/static", StaticFiles(directory='static'), name='static')

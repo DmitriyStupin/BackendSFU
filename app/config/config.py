@@ -21,6 +21,7 @@ class UrlPrefix(BaseModel):
     prefix: str = "/api"
     test: str = "/test"
     posts: str = "/posts"
+    recipe: str = "/recipe"
 
 
 class Settings(BaseSettings):

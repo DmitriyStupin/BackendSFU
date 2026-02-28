@@ -38,6 +38,7 @@ class RecipeRead(RecipeBase):
     'from_attributes': True
   }
 
+
 @router.get('', response_model=list[RecipeRead])
 async def read_recipes(
   session: Annotated[
@@ -48,6 +49,7 @@ async def read_recipes(
   stmt = select(Recipe).order_by(Recipe.id)
   result = await session.scalars(stmt)
   return result.all()
+
 
 @router.post('', response_model=RecipeRead, status_code=status.HTTP_201_CREATED)
 async def store(
@@ -61,4 +63,16 @@ async def store(
                   cooking_time=recipe_create.cooking_time, difficulty=recipe_create.difficulty)
   session.add(recipe)
   await session.commit()
+  return recipe
+
+
+@router.get("/{id}", response_model=RecipeRead)
+async def show(
+  session: Annotated[
+    AsyncSession,
+    Depends(db_helper.session_getter),
+  ],
+  id: int,
+):
+  recipe = await session.get(Recipe, id)
   return recipe

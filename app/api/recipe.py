@@ -76,3 +76,25 @@ async def show(
 ):
   recipe = await session.get(Recipe, id)
   return recipe
+
+
+@router.put("/{id}", response_model=RecipeRead)
+async def update(
+  session: Annotated[
+    AsyncSession,
+    Depends(db_helper.session_getter),
+  ],
+  id: int,
+  recipe_update: RecipeUpdate,
+):
+  recipe = await session.get(Recipe, id)
+  if recipe_update.title is not None:
+    recipe.title = recipe_update.title
+  if recipe_update.description is not None:
+    recipe.description = recipe_update.description
+  if recipe_update.cooking_time is not None:
+    recipe.cooking_time = recipe_update.cooking_time
+  if recipe_update.difficulty is not None:
+    recipe.difficulty = recipe_update.difficulty
+  await session.commit()
+  return recipe

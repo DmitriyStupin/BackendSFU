@@ -1,5 +1,5 @@
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import ForeignKey, Integer
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import Integer, ForeignKey
 
 from .base import Base
 
@@ -13,7 +13,7 @@ class RecipeIngredient(Base):
     ingredient_id: Mapped[int] = mapped_column(ForeignKey("ingredients.id"))
 
     quantity: Mapped[int] = mapped_column(Integer)
-    measurement: Mapped[int] = mapped_column(Integer)  # enum как int
+    measurement: Mapped[int] = mapped_column(Integer)
 
-    def __repr__(self):
-        return f"RecipeIngredient(id={self.id})"
+    recipe = relationship("Recipe", back_populates="recipe_ingredients")
+    ingredient = relationship("Ingredient", back_populates="recipe_ingredients")

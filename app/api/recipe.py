@@ -10,6 +10,7 @@ from typing import Optional, Annotated
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from models import db_helper, Recipe
+from models import Recipe, Cuisine, Allergen, Ingredient, RecipeIngredient, recipe_allergens
 
 router = APIRouter(
   tags=["Recipe"],
@@ -38,6 +39,82 @@ class RecipeRead(RecipeBase):
     'from_attributes': True
   }
 
+class RecipeIngredientCreate(BaseModel):
+    ingredient_id: int
+    quantity: int
+    measurement: int  # enum как int
+
+
+class RecipeCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255)
+    description: str
+    cooking_time: int
+    difficulty: int
+
+    cuisine_id: int
+    allergen_ids: list[int] = []
+    ingredients: list[RecipeIngredientCreate] = []
+    
+    
+@router.post("", response_model=RecipeRead, status_code=201)
+async def create_recipe(
+    session: Annotated[AsyncSession, Depends(db_helper.session_getter)],
+    data: RecipeCreate,
+):
+    recipe = Recipe(
+        title=data.title,
+        description=data.description,
+        cooking_time=data.cooking_time,
+        difficulty=data.difficulty,
+        cuisine_id=data.cuisine_id,
+    )
+
+    session.add(recipe)
+    await session.flush()  
+
+    if data.allergen_ids:
+        await session.execute(
+            recipe_allergens.insert().values(
+                [
+                    {"recipe_id": recipe.id, "allergen_id": a_id}
+                    for a_id in data.allergen_ids
+                ]
+            )
+        )
+
+    for item in data.ingredients:
+        recipe_ingredient = RecipeIngredient(
+            recipe_id=recipe.id,
+            ingredient_id=item.ingredient_id,
+            quantity=item.quantity,
+            measurement=item.measurement,
+        )
+        session.add(recipe_ingredient)
+
+    await session.commit()
+
+    return recipe
+  
+@router.get("/{id}")
+async def get_recipe(
+    id: int,
+    session: Annotated[AsyncSession, Depends(db_helper.session_getter)],
+):
+    recipe = await session.get(Recipe, id)
+
+    allergens = await session.execute(
+        recipe_allergens.select().where(recipe_allergens.c.recipe_id == id)
+    )
+
+    ingredients = await session.execute(
+        select(RecipeIngredient).where(RecipeIngredient.recipe_id == id)
+    )
+
+    return {
+        **recipe.__dict__,
+        "allergens": allergens.mappings().all(),
+        "ingredients": ingredients.scalars().all(),
+    }
 
 @router.get('', response_model=list[RecipeRead])
 async def read_recipes(
@@ -116,3 +193,4 @@ async def destroy(
   
   await session.delete(recipe)
   await session.commit()
+  

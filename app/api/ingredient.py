@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Annotated
 from pydantic import BaseModel
+from models import Recipe, RecipeIngredient
 
 from models import db_helper, Ingredient
 
@@ -82,3 +83,28 @@ async def delete_ingredient(
 
     await session.delete(ingredient)
     await session.commit()
+    
+@router.get("/{id}/recipes")
+async def get_recipes_by_ingredient(
+    id: int,
+    session: AsyncSession = Depends(db_helper.session_getter),
+):
+    # 1. находим связи ingredient → recipes
+    stmt_links = select(RecipeIngredient).where(
+        RecipeIngredient.ingredient_id == id
+    )
+    links = await session.scalars(stmt_links)
+    links = links.all()
+
+    # если нет связей — пустой список
+    if not links:
+        return []
+
+    # 2. достаём recipe_id
+    recipe_ids = [link.recipe_id for link in links]
+
+    # 3. забираем рецепты
+    stmt_recipes = select(Recipe).where(Recipe.id.in_(recipe_ids))
+    recipes = await session.scalars(stmt_recipes)
+
+    return recipes.all()

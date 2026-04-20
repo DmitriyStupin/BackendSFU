@@ -1,6 +1,5 @@
-from sqlalchemy import Table, Column, ForeignKey
+from sqlalchemy import Table, Column, Integer, ForeignKey
 from .base import Base
-
 
 recipe_allergens = Table(
     "recipe_allergens",

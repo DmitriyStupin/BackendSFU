@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
-from sqlalchemy import String, Text, Integer, CheckConstraint
+from sqlalchemy import String, Text, Integer, CheckConstraint, ForeignKey
 
 from .base import Base
 
@@ -13,6 +13,7 @@ class Recipe(Base):
     description: Mapped[str] = mapped_column(Text)
     cooking_time: Mapped[int] = mapped_column(Integer)
     difficulty: Mapped[int] = mapped_column(Integer, default=1)
+    cuisine_id: Mapped[int] = mapped_column(ForeignKey('cuisines.id'))
 
     # __table_args__ = (
     #     CheckConstraint(

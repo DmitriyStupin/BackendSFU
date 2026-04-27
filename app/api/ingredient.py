@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Annotated
 from pydantic import BaseModel
+from sqlalchemy.orm import selectinload
 from models import Recipe, RecipeIngredient
 
 from models import db_helper, Ingredient
@@ -87,24 +88,90 @@ async def delete_ingredient(
 @router.get("/{id}/recipes")
 async def get_recipes_by_ingredient(
     id: int,
+    include: str | None = Query(default=None),
+    select_fields: str | None = Query(default=None, alias="select"),
     session: AsyncSession = Depends(db_helper.session_getter),
 ):
-    # 1. находим связи ingredient → recipes
-    stmt_links = select(RecipeIngredient).where(
-        RecipeIngredient.ingredient_id == id
+    include_options = {
+        item.strip() for item in (include or "").split(",") if item.strip()
+    }
+    allowed_include = {"cuisine", "ingredients", "allergens"}
+    invalid_include = include_options - allowed_include
+    if invalid_include:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unsupported include values: {', '.join(sorted(invalid_include))}",
+        )
+
+    selected_fields = {
+        item.strip() for item in (select_fields or "").split(",") if item.strip()
+    }
+    allowed_fields = {"id", "name", "difficulty", "description", "cooking_time"}
+    if selected_fields:
+        invalid_fields = selected_fields - allowed_fields
+        if invalid_fields:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Unsupported select values: {', '.join(sorted(invalid_fields))}",
+            )
+    else:
+        selected_fields = allowed_fields
+
+    query = (
+        select(Recipe)
+        .join(RecipeIngredient, RecipeIngredient.recipe_id == Recipe.id)
+        .where(RecipeIngredient.ingredient_id == id)
+        .distinct()
     )
-    links = await session.scalars(stmt_links)
-    links = links.all()
 
-    # если нет связей — пустой список
-    if not links:
-        return []
+    if "cuisine" in include_options:
+        query = query.options(selectinload(Recipe.cuisine))
+    if "ingredients" in include_options:
+        query = query.options(
+            selectinload(Recipe.recipe_ingredients).selectinload(RecipeIngredient.ingredient)
+        )
+    if "allergens" in include_options:
+        query = query.options(selectinload(Recipe.allergens))
 
-    # 2. достаём recipe_id
-    recipe_ids = [link.recipe_id for link in links]
+    recipes = (await session.scalars(query)).all()
 
-    # 3. забираем рецепты
-    stmt_recipes = select(Recipe).where(Recipe.id.in_(recipe_ids))
-    recipes = await session.scalars(stmt_recipes)
+    result: list[dict] = []
+    for recipe in recipes:
+        item: dict = {}
 
-    return recipes.all()
+        if "id" in selected_fields:
+            item["id"] = recipe.id
+        if "name" in selected_fields:
+            item["name"] = recipe.title
+        if "difficulty" in selected_fields:
+            item["difficulty"] = recipe.difficulty
+        if "description" in selected_fields:
+            item["description"] = recipe.description
+        if "cooking_time" in selected_fields:
+            item["cooking_time"] = recipe.cooking_time
+
+        if "cuisine" in include_options:
+            item["cuisine"] = (
+                {"id": recipe.cuisine.id, "name": recipe.cuisine.name}
+                if recipe.cuisine
+                else None
+            )
+        if "ingredients" in include_options:
+            item["ingredients"] = [
+                {
+                    "id": ri.id,
+                    "ingredient_id": ri.ingredient_id,
+                    "ingredient_name": ri.ingredient.name if ri.ingredient else None,
+                    "quantity": ri.quantity,
+                    "measurement": ri.measurement,
+                }
+                for ri in recipe.recipe_ingredients
+            ]
+        if "allergens" in include_options:
+            item["allergens"] = [
+                {"id": allergen.id, "name": allergen.name} for allergen in recipe.allergens
+            ]
+
+        result.append(item)
+
+    return result
